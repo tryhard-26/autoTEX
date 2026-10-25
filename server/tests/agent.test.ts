@@ -52,7 +52,14 @@ describe('Agent runner', () => {
     );
     expect(prompt).toContain('a = b');
     expect(prompt).toContain('main.tex:2: Undefined control sequence');
-    expect(prompt).toContain('tectonic --keep-logs --synctex main.tex'); // compile-and-fix loop
+    expect(prompt).toContain('Project files: main.tex'); // new session: orient with the file list
+    expect(new AgentRunner(TEST_ROOT).buildPrompt('x', { projectTree: ['main.tex'], recentErrors: [] }, 'main.tex', false)).not.toContain(
+      'Project files'
+    ); // continuing session: no file list
+
+    const system = new AgentRunner(TEST_ROOT).systemPrompt('main.tex', 'tectonic');
+    expect(system).toContain('tectonic --keep-logs --synctex main.tex'); // compile-and-fix loop
+    expect(system).toContain('skills/beamer'); // where the on-demand reference files are
   });
 
   it('session memory is never deleted: a new conversation archives the old one', () => {
@@ -107,6 +114,10 @@ describe('Agent runner', () => {
     const config = JSON.parse(fs.readFileSync(configOut, 'utf-8'));
     fs.rmSync(configOut);
     expect(config.instructions.map((p: string) => path.relative(process.cwd(), p)).sort()).toEqual(['skills/beamer/SKILL.md', 'skills/latex/SKILL.md']);
+    // Lean dedicated agent: own prompt, no web/subagent/skill-catalog tools, old tool output pruned.
+    expect(config.agent.autotex.prompt).toContain('autoTEX');
+    expect(config.agent.autotex.permission).toMatchObject({ webfetch: 'deny', task: 'deny', skill: 'deny' });
+    expect(config.compaction.prune).toBe(true);
     expect(msg.edits?.map((e) => e.file)).toEqual(['main.tex']);
     const session = path.join(TEST_ROOT, '.autotex', 'opencode-session.json');
     expect(JSON.parse(fs.readFileSync(session, 'utf-8')).id).toBe('ses_fake');

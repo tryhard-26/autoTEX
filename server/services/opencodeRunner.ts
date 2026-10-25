@@ -6,14 +6,43 @@ import { AgentToolCall } from '../../src/types/agent';
 // whatever providers the user logged into (`opencode auth login`). Model ids are "provider/model".
 
 const STALL_MS = 5 * 60_000; // no output from opencode for this long = the model stopped responding
-// `instructions` (skill files) are loaded into the model's context on every request; opencode needs
-// explicit paths there, globs don't work. The agent is kept inside the project (plus `allowRead` dirs):
-// no wandering through autoTEX's own source/logs or the rest of the disk.
-const config = (instructions: string[], allowRead: string[]) =>
+// Everything here is about tokens: each request resends the system prompt, tool schemas and instructions.
+// - A dedicated `autotex` agent replaces opencode's generic coding prompt and drops tools a LaTeX agent
+//   never needs (web, subagents, todos, skill catalog): ~17k -> ~3.5k tokens per request before skills.
+// - `instructions` (the skill cores) load on every request; opencode needs explicit paths, not globs.
+// - compaction.prune drops old tool outputs (earlier file reads) from long sessions.
+// The agent is kept inside the project plus `allowRead` dirs (the skills).
+const AGENT = 'autotex';
+const UNUSED_TOOLS = ['webfetch', 'websearch', 'codesearch', 'task', 'todowrite', 'todoread', 'skill'];
+// Script-patching files bypasses the edit tool (so no diff, no exact-match check) and was the main way
+// weaker models went off the rails; the prompt asks them not to, this enforces it.
+const BASH_DENY = ['perl *', 'python *', 'python3 *', 'sed -i*', 'awk -i*'];
+const config = (prompt: string, instructions: string[], allowRead: string[]) =>
   JSON.stringify({
     instructions,
+    autoupdate: false,
+    compaction: { auto: true, prune: true },
+    agent: {
+      [AGENT]: {
+        mode: 'primary',
+        description: 'autoTEX LaTeX agent',
+        prompt,
+        permission: {
+          ...Object.fromEntries(UNUSED_TOOLS.map((t) => [t, 'deny'])),
+          bash: { '*': 'allow', ...Object.fromEntries(BASH_DENY.map((c) => [c, 'deny'])) },
+        },
+      },
+    },
     permission: { external_directory: { '*': 'deny', ...Object.fromEntries(allowRead.map((d) => [`${d}/*`, 'allow'])) } },
   });
+
+// Keep the user's global setup out of autoTEX turns: ~/.claude instructions and other tools' skill
+// catalogs cost ~9k tokens per request and have nothing to do with LaTeX.
+const ENV = {
+  OPENCODE_DISABLE_CLAUDE_CODE: '1',
+  OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
+  OPENCODE_DISABLE_AUTOUPDATE: '1',
+};
 
 // opencode runs as a child process; if the server stops, take it down too, otherwise it keeps editing
 // the project with nothing left to cancel it. (A SIGKILLed server can't clean up; nothing can.)
@@ -62,6 +91,16 @@ export async function listOpencodeModels(): Promise<OpencodeModel[]> {
   return models;
 }
 
+/**
+ * Tool inputs as kept in the chat transcript. A write/edit carries whole file contents, which the UI never
+ * shows and which made saved transcripts hundreds of KB; long values are cut down.
+ */
+function slimArgs(input: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(input).map(([k, v]) => [k, typeof v === 'string' && v.length > 300 ? `${v.slice(0, 300)}… (${v.length} chars)` : v])
+  );
+}
+
 export interface OpencodeTurn {
   text: string;
   thinking: string;
@@ -78,6 +117,7 @@ export async function runOpencode(opts: {
   dir: string;
   model: string;
   prompt: string;
+  systemPrompt: string;
   sessionId?: string;
   instructions?: string[];
   allowRead?: string[];
@@ -89,12 +129,14 @@ export async function runOpencode(opts: {
 }): Promise<OpencodeTurn> {
   const bin = opencodeBin();
   if (!bin) throw new Error('opencode is not installed (bun add -g opencode-ai)');
-  const args = [bin, 'run', '--format', 'json', '--thinking', '--print-logs', '--log-level', 'INFO', '--dir', opts.dir, '-m', opts.model];
+  // --title skips opencode's extra LLM call that names the session.
+  const title = opts.prompt.split('Request:\n').pop()!.slice(0, 60).replace(/\s+/g, ' ');
+  const args = [bin, 'run', '--format', 'json', '--thinking', '--print-logs', '--log-level', 'INFO', '--dir', opts.dir, '-m', opts.model, '--agent', AGENT, '--title', title || 'autoTEX'];
   if (opts.sessionId) args.push('--session', opts.sessionId);
   args.push(opts.prompt);
 
   opts.onLog(`opencode run -m ${opts.model}${opts.sessionId ? ` --session ${opts.sessionId}` : ' (new session)'}`);
-  const proc = Bun.spawn(args, { cwd: opts.dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, OPENCODE_CONFIG_CONTENT: config(opts.instructions ?? [], opts.allowRead ?? []) } });
+  const proc = Bun.spawn(args, { cwd: opts.dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...ENV, OPENCODE_CONFIG_CONTENT: config(opts.systemPrompt, opts.instructions ?? [], opts.allowRead ?? []) } });
   running.add(proc);
   const kill = () => proc.kill();
   opts.signal.addEventListener('abort', kill, { once: true });
@@ -148,10 +190,10 @@ export async function runOpencode(opts: {
       const call: AgentToolCall = {
         id: p.callID ?? `oc-${turn.toolCalls.length}`,
         name: p.tool ?? 'tool',
-        args: input,
+        args: slimArgs(input),
         status: p.state?.status === 'error' ? 'failed' : 'completed',
         summary: `${p.tool} ${target}`.trim(),
-        output: String(p.state?.output ?? p.state?.error ?? '').slice(0, 4000),
+        output: String(p.state?.output ?? p.state?.error ?? '').slice(0, 1500),
       };
       turn.toolCalls.push(call);
       opts.onTool(call);

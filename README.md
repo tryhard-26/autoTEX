@@ -81,7 +81,7 @@ description: How our lab writes papers
 Use \SI{}{} for units. Figures go in figures/. Cite with \citep.
 ```
 
-Keep your skills focused and concise. autoTEX loads the full contents of every skill whenever you make a request, so lengthy instructions will consume more of the model's context. Including only the rules that matter will help the agent follow them without wasting tokens.
+Keep your skills focused and concise. autoTEX sends the full contents of every `SKILL.md` with every request, so lengthy instructions will consume more of the model's context. If a skill needs longer material, such as a step-by-step workflow or a set of examples, put it in separate files in the same directory and mention them in `SKILL.md`. The agent reads those files only when a task calls for them. The built-in Beamer skill works this way, with its longer guides in `skills/beamer/reference/`.
 
 ## Shortcuts
 

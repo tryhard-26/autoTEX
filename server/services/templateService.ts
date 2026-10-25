@@ -84,6 +84,9 @@ Our findings demonstrate robust bounds under adversarial perturbations.
       'main.tex': `\\documentclass[aspectratio=169,10pt]{beamer}
 
 \\usetheme{Madrid}
+% Madrid draws shadows that emit "Missing character" warnings under XeTeX; turn them off
+\\setbeamertemplate{blocks}[rounded][shadow=false]
+\\setbeamertemplate{title page}[default][colsep=-4bp,rounded=true,shadow=false]
 \\usecolortheme{default}
 \\setbeamertemplate{navigation symbols}{}
 \\setbeamertemplate{footline}[frame number]

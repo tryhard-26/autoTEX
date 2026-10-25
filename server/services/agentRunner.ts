@@ -156,11 +156,27 @@ export class AgentRunner extends EventEmitter {
     return this.skills;
   }
 
-  /** The message sent to opencode: targeted context (never the whole project), the request, and house rules. */
-  public buildPrompt(prompt: string, context: AgentProjectContext, mainFile: string, engine = 'tectonic'): string {
+  /** System prompt for the autotex agent. Static per project and engine, so providers can cache it. */
+  public systemPrompt(mainFile: string, engine = 'tectonic'): string {
     const cmd = (COMPILE_CMD[engine] ?? ((m: string) => `${engine} -interaction=nonstopmode -synctex=1 ${m}`))(mainFile);
+    return [
+      'You are the agent inside autoTEX, a LaTeX editor. You work on one LaTeX project in the current folder.',
+      '- Read a file before editing it. Make targeted edits with the edit tool; use write only for new files or full rewrites. Never patch files with python or sed scripts.',
+      `- After changing .tex or .bib files, compile with: ${cmd}`,
+      `  Fix every error and every Overfull/Underfull \\hbox/\\vbox warning (check the output and ${mainFile.replace(/\.tex$/, '.log')}). Repeat until it compiles cleanly; never stop at a broken build.`,
+      ...(this.skills.length
+        ? [`- Follow the skills in your instructions. Their longer reference files, read only when the task needs one: ${this.skills.map((s) => path.dirname(s.path)).join(', ')}`]
+        : []),
+      '- Stay inside the project folder.',
+      '- Keep replies short: say what you changed or answer the question. Never paste whole files.',
+    ].join('\n');
+  }
 
-    const lines = [`Main file: ${mainFile}`, `Project files: ${context.projectTree.join(', ') || '(none)'}`];
+  /** The per-turn message: targeted context (never the whole project) and the request. */
+  public buildPrompt(prompt: string, context: AgentProjectContext, mainFile: string, newSession = true): string {
+    const lines = [`Main file: ${mainFile}`];
+    // The file list only matters to orient a new session; after that the agent can list files itself.
+    if (newSession) lines.push(`Project files: ${context.projectTree.join(', ') || '(none)'}`);
     if (context.activeFile) lines.push(`Open file: ${context.activeFile}${context.cursorLine ? ` (cursor at line ${context.cursorLine})` : ''}`);
     if (context.selectedText) {
       const r = context.selectionRange;
@@ -169,18 +185,7 @@ export class AgentRunner extends EventEmitter {
     if (context.recentErrors.length > 0) {
       lines.push('Last compile errors:', ...context.recentErrors.slice(0, 20).map((e) => `- ${e.file}:${e.line}: ${e.message}`));
     }
-    lines.push(
-      '',
-      'Request:',
-      prompt,
-      '',
-      '(autoTEX instructions — you are editing a LaTeX project inside the autoTEX editor.',
-      '- Make changes with your edit/write tools. Do not patch files with python/sed scripts.',
-      `- After editing, compile from the project folder with: ${cmd}`,
-      `  Then fix every error and every Overfull/Underfull \\hbox/\\vbox warning (check the output and ${mainFile.replace(/\.tex$/, '.log')}). Repeat until it compiles cleanly; do not stop at a broken build.`,
-      ...(this.skills.length ? [`- Follow the skills loaded in your instructions (${this.skills.map((s) => s.name).join(', ')}); they are the house style.`] : []),
-      '- Stay inside this project folder. Keep the final reply short: what you changed.)'
-    );
+    lines.push('', 'Request:', prompt);
     return lines.join('\n');
   }
 
@@ -211,9 +216,10 @@ export class AgentRunner extends EventEmitter {
       turn = await runOpencode({
         dir: this.projectRoot,
         model,
-        prompt: this.buildPrompt(prompt, context, mainFile, engine),
+        prompt: this.buildPrompt(prompt, context, mainFile, !sessionId),
+        systemPrompt: this.systemPrompt(mainFile, engine),
         sessionId,
-        instructions: this.skills.map((s) => s.path), // always in context, every request
+        instructions: this.skills.map((s) => s.path), // skill cores: always in context, every request
         allowRead: this.skills.map((s) => path.dirname(s.path)),
         signal: this.abort.signal,
         onText: (t) => this.emit('token', t),
