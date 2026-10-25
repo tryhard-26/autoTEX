@@ -1,0 +1,83 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\usepackage{amsmath,amssymb,amsthm,booktabs,mathtools}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+
+% Semantic colors (beamer skill guidelines)
+\definecolor{positive}{HTML}{0173B2}
+\definecolor{negative}{HTML}{DE8F05}
+\definecolor{emphasis}{HTML}{029E73}
+\definecolor{neutral}{gray}{0.55}
+
+\newcommand{\pos}[1]{\textcolor{positive}{#1}}
+\newcommand{\con}[1]{\textcolor{negative}{#1}}
+\newcommand{\HL}[1]{\textcolor{emphasis}{#1}}
+
+\title{Scalable Verification of Neural Networks}
+\subtitle{Symbolic Execution and Polyhedral Abstractions}
+\author{Presenter: Alex Vance}
+\institute{Institute for Advanced Computation}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Problem Formulation: Why Formal Guarantees?}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Traditional Testing:}
+      \begin{itemize}
+        \item Empirical sampling of input space
+        \item \con{Blind to adversarial corner cases}
+        \item Unsound for safety-critical controllers
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Formal Verification:}
+      \begin{itemize}
+        \item Complete guarantees over intervals
+        \item \pos{Mathematically provable bounds}
+        \item Scales via abstract interpretation
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+  \vspace{1em}
+  \begin{block}{Verification Goal}
+    Prove that for all $x \in \mathcal{X}_{\text{in}}$, the neural output satisfies $f(x) \in \mathcal{Y}_{\text{safe}}$.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Core Results}
+  \begin{table}
+    \centering
+    \begin{tabular}{lrr}
+      \toprule
+      Benchmark & Reluplex & Our Polyhedral Bound \\
+      \midrule
+      ACAS Xu (N=10) & 18.4s & \HL{1.2s} \\
+      MNIST Defense & Timeout & \HL{24.8s} \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+\begin{frame}{References}
+  \begin{thebibliography}{9}
+    \bibitem{katz2017reluplex}
+    G.~Katz et~al., ``Reluplex: An efficient SMT solver for verifying deep neural networks,'' \textit{CAV}, 2017.
+  \end{thebibliography}
+\end{frame}
+
+\end{document}

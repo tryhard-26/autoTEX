@@ -1,0 +1,8 @@
+{
+  "id": "sample-paper",
+  "name": "Research Paper",
+  "template": "article",
+  "mainFile": "main.tex",
+  "createdAt": 1789732268510,
+  "updatedAt": 1789732268510
+}

@@ -1,0 +1,62 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Secrets
+.env
+.env.*
+
+# Logs
+.logs/
+*.log
+
+# Your projects stay local; only the two samples are tracked.
+projects/*
+!projects/sample-beamer/
+!projects/sample-paper/
+projects/kernel-exploits/
+
+# Per-project agent history (chat transcripts, opencode session ids)
+.autotex/
+
+# LaTeX build output
+*.pdf
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.lof
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+*.xdv
+
+# Test workspaces
+.agent_test_workspace/
+.archive_test_workspace/
+.compiler_test/
+.test_projects_workspace/
+.test_workspace/
+
+# Local notes and agent config
+prompt.md
+CLAUDE.md
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+.DS_Store
+Thumbs.db

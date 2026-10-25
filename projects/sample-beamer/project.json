@@ -1,0 +1,8 @@
+{
+  "id": "sample-beamer",
+  "name": "Beamer Presentation",
+  "template": "beamer",
+  "mainFile": "main.tex",
+  "createdAt": 1789732268511,
+  "updatedAt": 1789732268511
+}
