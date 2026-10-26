@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { AgentMessage, AgentFileEdit, AgentProjectContext, AgentSkillInfo } from '../../src/types/agent';
 import { createAgentFileEdit } from '../../src/utils/diff';
+import { countTokens } from 'gpt-tokenizer';
 import { opencodeBin, runOpencode } from './opencodeRunner';
 
 const DEFAULT_MODEL = process.env.OPENCODE_MODEL || 'opencode/big-pickle';
@@ -49,6 +50,9 @@ const COMPILE_CMD: Record<string, (main: string) => string> = {
 };
 
 const SESSION_DIR = '.autotex';
+// Every SKILL.md rides along with every request, so their combined size is a fixed per-request cost.
+// Over budget, autoTEX still loads them all (skills are always read) but warns in the agent log.
+const SKILLS_TOKEN_BUDGET = Number(process.env.SKILLS_TOKEN_BUDGET) || 6000;
 
 export interface AgentOptions {
   model?: string; // opencode "provider/model"; defaults to OPENCODE_MODEL
@@ -144,12 +148,23 @@ export class AgentRunner extends EventEmitter {
       for (const name of fs.readdirSync(dir)) {
         const skillPath = path.join(dir, name, 'SKILL.md');
         if (!fs.existsSync(skillPath)) continue;
-        const head = fs.readFileSync(skillPath, 'utf-8').slice(0, 2000);
-        const description = head.match(/^description:\s*[|>]?\s*(.+)$/m)?.[1]?.replace(/^["']|["']$/g, '') ?? '';
-        this.skills.push({ name, description, path: skillPath, category: name.includes('beamer') ? 'beamer' : 'latex' });
+        const text = fs.readFileSync(skillPath, 'utf-8');
+        const description = text.slice(0, 2000).match(/^description:\s*[|>]?\s*(.+)$/m)?.[1]?.replace(/^["']|["']$/g, '') ?? '';
+        // Token counts use OpenAI's o200k encoding; other models' tokenizers differ by roughly ±20%.
+        const tokens = countTokens(text);
+        this.skills.push({ name, description, path: skillPath, category: name.includes('beamer') ? 'beamer' : 'latex', tokens });
       }
     }
+    const total = this.skillTokens();
+    if (total > SKILLS_TOKEN_BUDGET) {
+      const sizes = this.skills.map((s) => `${s.name} ${s.tokens}`).join(', ');
+      this.emit('log', `Skills use ~${total} tokens per request, over the ${SKILLS_TOKEN_BUDGET} budget (${sizes}). Move long material into reference files.`);
+    }
     return this.skills;
+  }
+
+  public skillTokens(): number {
+    return this.skills.reduce((n, s) => n + s.tokens, 0);
   }
 
   public getSkills(): AgentSkillInfo[] {
@@ -202,6 +217,7 @@ export class AgentRunner extends EventEmitter {
     const model = options.model || this.model;
     const startTime = Date.now();
     this.emit('log', `Turn started with ${model}`);
+    this.loadSkills(); // pick up skills added or edited since the last turn without a restart
     const before = snapshotProject(this.projectRoot);
     this.abort = new AbortController();
 
@@ -211,13 +227,19 @@ export class AgentRunner extends EventEmitter {
       sessionId = JSON.parse(fs.readFileSync(sessionFile, 'utf-8')).id;
     } catch {}
 
+    const message = this.buildPrompt(prompt, context, mainFile, !sessionId);
+    const system = this.systemPrompt(mainFile, engine);
+    this.emit(
+      'log',
+      `autoTEX context: message ~${countTokens(message)} + system prompt ~${countTokens(system)} + skills ~${this.skillTokens()} tokens (plus opencode's own prompt and tools)`
+    );
     let turn: Awaited<ReturnType<typeof runOpencode>>;
     try {
       turn = await runOpencode({
         dir: this.projectRoot,
         model,
-        prompt: this.buildPrompt(prompt, context, mainFile, !sessionId),
-        systemPrompt: this.systemPrompt(mainFile, engine),
+        prompt: message,
+        systemPrompt: system,
         sessionId,
         instructions: this.skills.map((s) => s.path), // skill cores: always in context, every request
         allowRead: this.skills.map((s) => path.dirname(s.path)),

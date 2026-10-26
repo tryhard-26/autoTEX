@@ -68,7 +68,7 @@ For security and isolation, the agent cannot access files outside the current pr
 
 Skills let you customise how the agent approaches different kinds of writing. Each skill acts as a set of instructions that guides the agent whenever you make a request. autoTEX comes with two built-in skills, `skills/latex` for standard LaTeX documents and `skills/beamer` for presentations and slides.
 
-You can create your own skills to define the conventions and formatting rules that the agent should follow for a particular project or workflow. To add one, create a directory under `skills/` and place a `SKILL.md` file inside it. Restart the server for your new skill to take effect.
+You can create your own skills to define the conventions and formatting rules that the agent should follow for a particular project or workflow. To add one, create a directory under `skills/` and place a `SKILL.md` file inside it. Your new skill takes effect on your next message.
 
 For example, you could create `skills/lab-style/SKILL.md` with the following content:
 

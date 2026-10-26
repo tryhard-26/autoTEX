@@ -16,9 +16,12 @@ describe('Agent runner', () => {
 
   afterEach(() => fs.rmSync(TEST_ROOT, { recursive: true, force: true }));
 
-  it('loads skills from skills/', () => {
-    const names = new AgentRunner(TEST_ROOT).getSkills().map((s) => s.name);
+  it('loads skills from skills/ and counts their tokens', () => {
+    const runner = new AgentRunner(TEST_ROOT);
+    const names = runner.getSkills().map((s) => s.name);
     expect(names).toContain('latex');
+    expect(runner.getSkills().every((s) => s.tokens > 100)).toBe(true);
+    expect(runner.skillTokens()).toBeLessThan(6000); // the built-in skills stay within the default budget
     expect(names).toContain('beamer');
   });
 
