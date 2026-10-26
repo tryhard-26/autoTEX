@@ -68,7 +68,7 @@ For security and isolation, the agent cannot access files outside the current pr
 
 Skills let you customise how the agent approaches different kinds of writing. Each skill acts as a set of instructions that guides the agent whenever you make a request. autoTEX comes with two built-in skills, `skills/latex` for standard LaTeX documents and `skills/beamer` for presentations and slides.
 
-You can create your own skills to define the conventions and formatting rules that the agent should follow for a particular project or workflow. To add one, create a directory under `skills/` and place a `SKILL.md` file inside it. Restart the server for your new skill to take effect.
+You can create your own skills to define the conventions and formatting rules that the agent should follow for a particular project or workflow. To add one, create a directory under `skills/` and place a `SKILL.md` file inside it. Your new skill takes effect on your next message.
 
 For example, you could create `skills/lab-style/SKILL.md` with the following content:
 
@@ -98,6 +98,12 @@ Keyboard shortcuts are designed to make common actions accessible without consta
 | Find / replace shortcut | Find or replace |
 | Settings shortcut | Open Settings |
 
+## How autoTEX keeps token use down
+
+Each agent request carries a system prompt, tool definitions, your skills and the conversation so far, and all of that counts against the model's context and your usage. autoTEX runs the agent with a short LaTeX-specific prompt and only the tools it needs, and keeps your global opencode and Claude Code setup out of its sessions. It also counts each skill's tokens, which you can see by hovering over the Agent label, and the agent log warns if your skills grow past the budget.
+
+Long sessions are trimmed by opencode's own pruning and by the [Dynamic Context Pruning](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) plugin. That plugin keeps only the latest copy of repeated tool output, such as the same file read several times, and drops failed tool calls after a few turns. Its settings are in `opencode/dcp.jsonc`. The plugin is AGPL-3.0 licensed and is downloaded by opencode the first time the agent runs; set `AUTOTEX_DCP=0` to turn it off.
+
 ## Configuration
 
 You can configure autoTEX through a `.env` file or by setting environment variables. The following options control the agent, server, and project storage locations.
@@ -108,6 +114,8 @@ You can configure autoTEX through a `.env` file or by setting environment variab
 | `OPENCODE_BIN` | `opencode` on your `PATH` | The path to the opencode executable. |
 | `PORT` | `3001` | The port used by the server. |
 | `PROJECTS_DIR` | `./projects` | The directory where projects are stored. |
+| `SKILLS_TOKEN_BUDGET` | `6000` | Combined skill size, in tokens, above which the agent log warns. |
+| `AUTOTEX_DCP` | `1` | Set to `0` to turn off the Dynamic Context Pruning plugin. |
 
 ## Contributing
 

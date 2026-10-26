@@ -16,9 +16,12 @@ describe('Agent runner', () => {
 
   afterEach(() => fs.rmSync(TEST_ROOT, { recursive: true, force: true }));
 
-  it('loads skills from skills/', () => {
-    const names = new AgentRunner(TEST_ROOT).getSkills().map((s) => s.name);
+  it('loads skills from skills/ and counts their tokens', () => {
+    const runner = new AgentRunner(TEST_ROOT);
+    const names = runner.getSkills().map((s) => s.name);
     expect(names).toContain('latex');
+    expect(runner.getSkills().every((s) => s.tokens > 100)).toBe(true);
+    expect(runner.skillTokens()).toBeLessThan(6000); // the built-in skills stay within the default budget
     expect(names).toContain('beamer');
   });
 
@@ -118,6 +121,7 @@ describe('Agent runner', () => {
     expect(config.agent.autotex.prompt).toContain('autoTEX');
     expect(config.agent.autotex.permission).toMatchObject({ webfetch: 'deny', task: 'deny', skill: 'deny' });
     expect(config.compaction.prune).toBe(true);
+    expect(config.plugin).toEqual(['@tarquinen/opencode-dcp@3.2.0']); // session pruning plugin, pinned
     expect(msg.edits?.map((e) => e.file)).toEqual(['main.tex']);
     const session = path.join(TEST_ROOT, '.autotex', 'opencode-session.json');
     expect(JSON.parse(fs.readFileSync(session, 'utf-8')).id).toBe('ses_fake');

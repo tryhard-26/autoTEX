@@ -133,7 +133,11 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
           <Bot size={13} className="text-blue-400" />
           <span
             className="text-[11px] uppercase tracking-wider font-semibold text-neutral-300"
-            title={skills.length ? `Skills: ${skills.map((s) => s.name).join(', ')}` : undefined}
+            title={
+              skills.length
+                ? `Skills (sent with every request): ${skills.map((s) => `${s.name} ~${s.tokens ?? '?'} tokens`).join(', ')}`
+                : undefined
+            }
           >
             Agent
           </span>

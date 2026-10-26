@@ -1,0 +1,28 @@
+// Settings for Dynamic Context Pruning (@tarquinen/opencode-dcp), the opencode plugin autoTEX uses to keep
+// agent sessions small. autoTEX points opencode at this folder with OPENCODE_CONFIG_DIR.
+// Docs: https://github.com/Opencode-DCP/opencode-dynamic-context-pruning
+{
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+  "enabled": true,
+  // autoTEX pins the plugin version; no update checks against npm.
+  "autoUpdate": false,
+  // Don't add pruning notices to the conversation; they cost tokens and clutter the chat.
+  "pruneNotification": "off",
+  "compress": {
+    "mode": "range",
+    // The model-driven compress tool added ~3k tokens to every request (its tool schema and instructions)
+    // and saved nothing in short sessions, so it's off; the automatic strategies below cost nothing.
+    "permission": "deny",
+    // Free models have smaller budgets than the defaults (100k/50k) assume.
+    "maxContextLimit": 60000,
+    "minContextLimit": 30000,
+    "nudgeFrequency": 5,
+    "protectUserMessages": false
+  },
+  "strategies": {
+    // Repeated reads of the same file keep only the latest output.
+    "deduplication": { "enabled": true },
+    // Failed tool calls drop their inputs after a few turns.
+    "purgeErrors": { "enabled": true, "turns": 4 }
+  }
+}

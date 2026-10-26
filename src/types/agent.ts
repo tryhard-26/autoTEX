@@ -55,4 +55,5 @@ export interface AgentSkillInfo {
   description: string;
   path: string;
   category: 'latex' | 'beamer' | 'general';
+  tokens: number; // SKILL.md size; every skill is sent with every request
 }
