@@ -17,8 +17,14 @@ const UNUSED_TOOLS = ['webfetch', 'websearch', 'codesearch', 'task', 'todowrite'
 // Script-patching files bypasses the edit tool (so no diff, no exact-match check) and was the main way
 // weaker models went off the rails; the prompt asks them not to, this enforces it.
 const BASH_DENY = ['perl *', 'python *', 'python3 *', 'sed -i*', 'awk -i*'];
+// Session memory: Dynamic Context Pruning dedupes repeated file reads, purges failed tool calls and lets the
+// model compress stale history into summaries. Pinned version; its settings are in opencode/dcp.jsonc.
+export const DCP_PLUGIN = '@tarquinen/opencode-dcp@3.2.0';
+const CONFIG_DIR = path.join(import.meta.dir, '..', '..', 'opencode');
+
 const config = (prompt: string, instructions: string[], allowRead: string[]) =>
   JSON.stringify({
+    plugin: process.env.AUTOTEX_DCP === '0' ? [] : [DCP_PLUGIN],
     instructions,
     autoupdate: false,
     compaction: { auto: true, prune: true },
@@ -42,6 +48,7 @@ const ENV = {
   OPENCODE_DISABLE_CLAUDE_CODE: '1',
   OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
   OPENCODE_DISABLE_AUTOUPDATE: '1',
+  OPENCODE_CONFIG_DIR: CONFIG_DIR, // where the DCP plugin finds dcp.jsonc
 };
 
 // opencode runs as a child process; if the server stops, take it down too, otherwise it keeps editing

@@ -121,6 +121,7 @@ describe('Agent runner', () => {
     expect(config.agent.autotex.prompt).toContain('autoTEX');
     expect(config.agent.autotex.permission).toMatchObject({ webfetch: 'deny', task: 'deny', skill: 'deny' });
     expect(config.compaction.prune).toBe(true);
+    expect(config.plugin).toEqual(['@tarquinen/opencode-dcp@3.2.0']); // session pruning plugin, pinned
     expect(msg.edits?.map((e) => e.file)).toEqual(['main.tex']);
     const session = path.join(TEST_ROOT, '.autotex', 'opencode-session.json');
     expect(JSON.parse(fs.readFileSync(session, 'utf-8')).id).toBe('ses_fake');
